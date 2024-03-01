@@ -1,0 +1,6 @@
+.env
+my_env/
+
+company_management/__pycache__
+__pycache__/
+*.pyc
