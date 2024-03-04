@@ -1,22 +1,23 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView 
-from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , UserUpdateSerializer
+from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer
 from django.contrib.auth import authenticate 
 from company_management.renderers import UserRenderer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .models import User
+from .models import User , Company
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 
-
 def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
+    refresh_token = RefreshToken.for_user(user)
+    access_token = refresh_token.access_token
 
     return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        'refresh': str(refresh_token),
+        'access': str(access_token),
     }
 
 
@@ -32,20 +33,14 @@ class UserRegistrationView(APIView):
 
 
 class UserLoginView(APIView):
-  renderer_classes = [UserRenderer]
-  def post(self, request, format=None):
-    serializer = UserLoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    email = serializer.data.get('email')
-    password = serializer.data.get('password')
-    user = authenticate(email=email, password=password)
-    if user is not None:
-      token = get_tokens_for_user(user)
-      return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Login Success', 'data': {'token': token}}, status=status.HTTP_200_OK)
-    else:
-      return Response({'errors':{'non_field_errors':['Email or Password is not Valid']}}, status=status.HTTP_404_NOT_FOUND)
-    
-    
+    def post(self, request, format=None):
+        serializer = UserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        user = serializer.validated_data['user']
+        token = get_tokens_for_user(user)  
+        return Response({'status': status.HTTP_200_OK, 'success': True, 'token': token}, status=status.HTTP_200_OK)
+
     
 class UserProfileView(APIView):
     renderer_classes = [UserRenderer]
@@ -65,46 +60,76 @@ class UserListView(APIView):
         return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'User List', 'data': serializer.data})
     
 
-
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_object(self, id):
-        try:
-            return User.objects.get(id=id)
-        except User.DoesNotExist:
-            return None
-
     def get(self, request, id, format=None):
-        user = self.get_object(id)
-        if user is not None:
+        try:
+            user = get_object_or_404(User, id=id)
             serializer = UserProfileSerializer(user)
             return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'User Detail', 'data': serializer.data})
-        else:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-
-
-
-class UserUpdateView(APIView):
-    def get(self, request, id):
-        user = get_object_or_404(User, id=id)
-        serializer = UserUpdateSerializer(user)
-        return Response(serializer.data)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'User not found'})
 
     def patch(self, request, id):
-        user = get_object_or_404(User, id=id)
-        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'status': 200, 'success': True, 'message': 'User details updated successfully'})
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = get_object_or_404(User, id=id)
+            serializer = UserDetailSerializer(user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'status': 200, 'success': True, 'message': 'User details updated successfully'})
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
-
-class UserDeleteView(APIView):
     def delete(self, request, id, format=None):
         user = get_object_or_404(User, id=id)
         user.delete()
         return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True, 'message': 'User deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+    
+
+class CompanyView(APIView):
+    renderer_classes = [UserRenderer]
+    def get(self, request):
+        companies = Company.objects.all()
+        serializer = CompanySerializer(companies, many=True)
+        return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data})
+
+    def post(self, request):
+        serializer = CompanySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data})
+        return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': True , 'data': serializer.errors})  
+
+
+class CompanyDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id, format=None):
+        try:
+            company = get_object_or_404(Company, id=id)
+            serializer = CompanyDetailSerializer(company)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company Detail', 'data': serializer.data})
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'})
+
+
+    def patch(self, request, id):
+        try:
+            company = get_object_or_404(Company, id=id)
+            serializer = CompanyDetailSerializer(company, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company details updated successfully'})
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, id, format=None):
+        try:
+            company = get_object_or_404(Company, id=id)
+            company.delete()
+            return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True, 'message': 'Company deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)

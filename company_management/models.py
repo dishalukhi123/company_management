@@ -2,6 +2,9 @@ import pytz
 from django.contrib import admin
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
+from django.core.exceptions import ValidationError
+
+
 class UserManager(BaseUserManager):
     def create_user(self, email, username=None, first_name='', last_name='', gender='', password=None):
         if not email:
@@ -47,6 +50,7 @@ class User(AbstractBaseUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
@@ -82,3 +86,23 @@ class UserModelAdmin(admin.ModelAdmin):
     list_display = ('id', 'email', 'first_name', 'last_name', 'is_admin')
 
 admin.site.register(User, UserModelAdmin)
+
+
+class Company(models.Model):
+    TYPE_CHOICES = (
+        ('private company', 'Private Company'),
+        ('associate aompany', 'Associate company'),
+        ('government', 'Government'),
+    )
+    name = models.CharField(max_length=100 , unique = True)
+    location = models.CharField(max_length=255)
+    about = models.CharField(max_length = 200)
+    type = models.CharField(max_length = 40 , choices=TYPE_CHOICES) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True) 
+
+    
+    class Meta:
+        db_table = 'company'
+

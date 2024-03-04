@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User
+from .models import User , Company
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 class UserModelAdmin(BaseUserAdmin):
@@ -27,3 +27,13 @@ admin.site.unregister(User)
 
 # Register the new UserModelAdmin...
 admin.site.register(User, UserModelAdmin)
+
+
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'location', 'type', 'created_at', 'updated_at')
+    search_fields = ['name', 'location', 'type']
+    list_filter = ['type']
+    readonly_fields = ('created_at', 'updated_at')
+
+admin.site.register(Company, CompanyAdmin)
+
