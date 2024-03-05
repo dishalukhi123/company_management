@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.views import APIView 
 from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer
 from django.contrib.auth import authenticate 
-from company_management.renderers import UserRenderer
+from company_management.renderers import UserRenderer 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .models import User , Company
@@ -53,7 +53,7 @@ class UserProfileView(APIView):
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]  
-
+    renderer_classes = [UserRenderer]
     def get(self, request, format=None):
         queryset = User.objects.filter(is_active=True)
         serializer = UserListSerializer(queryset, many=True)
@@ -62,6 +62,7 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    renderer_classes = [UserRenderer]
 
     def get(self, request, id, format=None):
         try:
@@ -69,18 +70,21 @@ class UserDetailView(APIView):
             serializer = UserProfileSerializer(user)
             return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'User Detail', 'data': serializer.data})
         except Http404:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'User not found'})
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def patch(self, request, id):
         try:
             user = get_object_or_404(User, id=id)
             serializer = UserDetailSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
-                serializer.save()
-                return Response({'status': 200, 'success': True, 'message': 'User details updated successfully'})
+                if serializer.validated_data:  
+                    serializer.save()
+                    return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'User details updated successfully'})
+                else:  
+                    return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'No changes to update'})
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Http404:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'User not found'}})
 
     def delete(self, request, id, format=None):
         user = get_object_or_404(User, id=id)
@@ -99,37 +103,40 @@ class CompanyView(APIView):
         serializer = CompanySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data})
-        return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': True , 'data': serializer.errors})  
+            return Response({'status': status.HTTP_201_CREATED, 'success' : True , 'data': serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CompanyDetailView(APIView):
     permission_classes = [IsAuthenticated]
-
+    renderer_classes = [UserRenderer]
     def get(self, request, id, format=None):
         try:
             company = get_object_or_404(Company, id=id)
             serializer = CompanyDetailSerializer(company)
-            return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company Detail', 'data': serializer.data})
+            return Response({'status': status.HTTP_200_OK, 'success': True,'data': serializer.data})
         except Http404:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'})
-
-
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}}, status=status.HTTP_400_BAD_REQUEST)
+        
     def patch(self, request, id):
         try:
-            company = get_object_or_404(Company, id=id)
-            serializer = CompanyDetailSerializer(company, data=request.data, partial=True)
+            user = get_object_or_404(User, id=id)
+            serializer = CompanyDetailSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
-                serializer.save()
-                return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company details updated successfully'})
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                if serializer.validated_data:  
+                    serializer.save()
+                    return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company details updated successfully'})
+                else:  
+                    return Response({'status': status.HTTP_200_OK, 'success': True, 'errors': {'detail': 'No changes to update'}})
+            return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'company with this name already exists.'}} ,  status=status.HTTP_400_BAD_REQUEST)
         except Http404:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'Company not found'}})
+
 
     def delete(self, request, id, format=None):
         try:
             company = get_object_or_404(Company, id=id)
             company.delete()
-            return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True, 'message': 'Company deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+            return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True}, status=status.HTTP_204_NO_CONTENT)
         except Http404:
-            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'message': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}})
