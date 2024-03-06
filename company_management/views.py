@@ -24,7 +24,9 @@ def get_tokens_for_user(user):
 class UserRegistrationView(APIView):
   renderer_classes = [UserRenderer]
   def post(self, request, format=None):
+    print("----request.data----", request.data)
     serializer = UserRegistrationSerializer(data=request.data)
+    # print("---serializer---", serializer)
     if serializer.is_valid(raise_exception=True):
           user = serializer.save()
           token = get_tokens_for_user(user)
@@ -93,6 +95,7 @@ class UserDetailView(APIView):
     
 
 class CompanyView(APIView):
+    permission_classes = [IsAuthenticated]
     renderer_classes = [UserRenderer]
     def get(self, request):
         companies = Company.objects.all()
@@ -101,8 +104,27 @@ class CompanyView(APIView):
 
     def post(self, request):
         serializer = CompanySerializer(data=request.data)
+        print('=-=-=-=-=-=-=-=-' , request.data)
         if serializer.is_valid():
             serializer.save()
+            company_instance = serializer.instance
+
+            # Prepare the response data
+            response_data = {
+                "status": status.HTTP_201_CREATED,
+                "success": True,
+                "data": {
+                    "id": company_instance.id,
+                    "name": company_instance.name,
+                    "about": company_instance.about,
+                    "type": company_instance.type,
+                    "created_at": company_instance.created_at.strftime("%I:%M %p %A, %b %d, %Y"),
+                    "updated_at": company_instance.updated_at.strftime("%I:%M %p %A, %b %d, %Y"),
+                    "active": company_instance.active,
+                    "user_id": company_instance.user_id,
+                    "other_location": f"{company_instance.city}, {company_instance.state}, {company_instance.country}"
+                }
+            }
             return Response({'status': status.HTTP_201_CREATED, 'success' : True , 'data': serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -128,7 +150,7 @@ class CompanyDetailView(APIView):
                     return Response({'status': status.HTTP_200_OK, 'success': True, 'message': 'Company details updated successfully'})
                 else:  
                     return Response({'status': status.HTTP_200_OK, 'success': True, 'errors': {'detail': 'No changes to update'}})
-            return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'company with this name already exists.'}} ,  status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors,  status=status.HTTP_400_BAD_REQUEST)
         except Http404:
             return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'Company not found'}})
 

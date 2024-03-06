@@ -13,7 +13,7 @@ class UserRenderer(renderers.JSONRenderer):
         success = renderer_context.get('success', True)
         
         if 'ErrorDetail' in str(data):
-            response = json.dumps({ 'status': status.HTTP_400_BAD_REQUEST, 'success': False , 'message': message, 'errors': data})
+            response = json.dumps({ 'status': status.HTTP_400_BAD_REQUEST, 'success': False , 'errors': data})
         else:
             response = json.dumps(data)
         

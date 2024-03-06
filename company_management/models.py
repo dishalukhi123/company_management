@@ -43,6 +43,7 @@ class User(AbstractBaseUser):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    confirm_password = models.CharField(max_length = 300,null=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -59,7 +60,7 @@ class User(AbstractBaseUser):
 
     def has_perm(self, perm, obj=None):
         return self.is_admin
-
+    
     def has_module_perms(self, app_label):
         return True
 
@@ -71,27 +72,29 @@ class User(AbstractBaseUser):
         db_table = 'user'
 
 
-class UserModelAdmin(admin.ModelAdmin):
-    list_display = ('id', 'email', 'first_name', 'last_name', 'is_admin')
-
-admin.site.register(User, UserModelAdmin)
-
 
 class Company(models.Model):
     TYPE_CHOICES = (
         ('private company', 'Private Company'),
-        ('associate aompany', 'Associate company'),
+        ('associate company', 'Associate company'),
         ('government', 'Government'),
     )
-    name = models.CharField(max_length=100 , unique = True)
-    location = models.CharField(max_length=255)
+    
+    name = models.CharField(max_length=100 , unique = True )
+    city = models.CharField(max_length=100) 
+    state = models.CharField(max_length=100) 
+    country = models.CharField(max_length=100) 
     about = models.CharField(max_length = 200)
     type = models.CharField(max_length = 40 , choices=TYPE_CHOICES) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True) 
+    user_id = models.IntegerField(blank=True, null=True)
 
     
     class Meta:
         db_table = 'company'
+
+    
+        
 
