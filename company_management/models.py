@@ -43,7 +43,6 @@ class User(AbstractBaseUser):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
-    confirm_password = models.CharField(max_length = 300,null=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -94,6 +93,16 @@ class Company(models.Model):
     
     class Meta:
         db_table = 'company'
+
+class Department(models.Model):
+    name = models.CharField(max_length=100 , unique = True )
+    description = models.TextField(max_length=100)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'department'
 
     
         
