@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .utils import formatted_timestamp
-from .models import User , Companies , Departments
+from .models import User , Companies , Departments , Employees
 import pytz
 
 
@@ -111,6 +111,7 @@ class CompanySerializer(serializers.ModelSerializer):
         model = Companies
         fields = ['id', 'name', 'about', 'type', 'created_at', 'updated_at', 'active' ,'user_id' ,'city', 'state', 'country' , 'other_location' ]
 
+
 class CompanyDetailSerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
@@ -138,11 +139,23 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     def get_updated_at(self, instance):
         return formatted_timestamp(instance.updated_at)
+    
+    
+    def to_internal_value(self, data):
+        try:
+            company_id = data.get('company_id')
+            company = Companies.objects.get(pk=company_id)
+            validated_data = super().to_internal_value(data)
+            validated_data['company_id'] = company.pk
+            return validated_data
+        except (KeyError, ValueError, Companies.DoesNotExist):
+            raise serializers.ValidationError({"company_id": ["Invalid company_id - Company does not exist."]})
+
+
 
     class Meta:
         model = Departments
         fields = '__all__'
-
 
 
 class DepartmentDetailSerializer(serializers.ModelSerializer):
@@ -160,6 +173,79 @@ class DepartmentDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Departments
         fields = '__all__'
+
+        
+class EmployeeSerializer(serializers.ModelSerializer):
+    department_id = serializers.PrimaryKeyRelatedField(queryset=Departments.objects.all(), source='department', write_only=True)
+    department = serializers.SerializerMethodField()
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True )
+    company=CompanySerializer(read_only=True)
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
+    def get_department(self, instance):
+        department = instance.department
+        return {
+            "id": department.id,
+            "name": department.name,
+            "description": department.description,
+        }
+
+    def get_created_at(self, instance):
+        return formatted_timestamp(instance.created_at)
+
+    def get_updated_at(self, instance):
+        return formatted_timestamp(instance.updated_at)
+    
+    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists in the users table.")
+        return value
+
+    class Meta:
+        model = Employees
+        fields = '__all__'
+
+        
+
+class EmployeeDetailSerializer(serializers.ModelSerializer):
+    department_id = serializers.PrimaryKeyRelatedField(queryset=Departments.objects.all(), source='department', write_only=True)
+    department = serializers.SerializerMethodField()
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True )
+    company=CompanySerializer(read_only=True)
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
+    def get_department(self, instance):
+        department = instance.department
+        return {
+            "id": department.id,
+            "name": department.name,
+            "description": department.description,
+        }
+
+    def get_created_at(self, instance):
+        return formatted_timestamp(instance.created_at)
+
+    def get_updated_at(self, instance):
+        return formatted_timestamp(instance.updated_at)
+    
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists in the User table.")
+        elif Employees.objects.exclude(pk=self.instance.pk).filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists in the Employees table.")
+        return value
+
+
+    class Meta:
+        model = Employees
+        fields = '__all__'
+
+
+
         
 
 
