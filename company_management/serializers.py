@@ -1,33 +1,42 @@
 from rest_framework import serializers
 from .utils import formatted_timestamp
-from .models import User , Company
+from .models import User , Companies , Departments
 import pytz
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    password2 = serializers.CharField(style={'input_type': 'password'}, write_only=True)
+    confirm_password = serializers.CharField(style={'input_type': 'password'}, write_only=True)
 
     class Meta:
         model = User
-        fields = ['email', 'username' , 'first_name', 'last_name', 'gender' , 'password', 'password2']
+        fields = ['email', 'username' , 'first_name', 'last_name', 'gender' , 'password', 'confirm_password']
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
     def validate(self, attrs):
         password = attrs.get('password')
-        password2 = attrs.get('password2')
-        if password != password2:
-            raise serializers.ValidationError("Password and Confirm Password don't match")
-        return attrs
+        confirm_password = attrs.get('confirm_password')
+        email = attrs.get('email')
+        print("--attrs---", attrs)
+        errors = {}
+        # if password != confirm_password:
+        #     errors['password'] = ["Password and Confirm Password don't match"]
 
+        if User.objects.filter(email=email).exists():
+            errors['email'] = ["User with this email already exists."]
+
+        if errors:
+            print("---errors---", errors)
+            raise serializers.ValidationError(errors)
+
+        return attrs
+    
     def create(self, validated_data):
         password = validated_data.pop('password')
-        password2 = validated_data.pop('password2')
-        if password != password2:
-            raise serializers.ValidationError("Password and Confirm Password don't match")
+        validated_data.pop('confirm_password', None) 
         return User.objects.create_user(password=password, **validated_data)
-    
+     
 
 class UserLoginSerializer(serializers.Serializer):
     email_or_username = serializers.CharField()
@@ -77,14 +86,6 @@ class UserListSerializer(serializers.ModelSerializer):
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
-    created_at = serializers.SerializerMethodField()
-    updated_at = serializers.SerializerMethodField()
-
-    def get_created_at(self, instance):
-        return formatted_timestamp(instance.created_at)
-
-    def get_updated_at(self, instance):
-        return formatted_timestamp(instance.updated_at)
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'first_name', 'last_name', 'gender', 'created_at', 'updated_at']
@@ -93,16 +94,22 @@ class UserDetailSerializer(serializers.ModelSerializer):
 class CompanySerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
+    other_location  = serializers.SerializerMethodField()
+ 
+    def get_created_at(self, obj):
+        return formatted_timestamp(obj.created_at)
 
-    def get_created_at(self, instance):
-        return formatted_timestamp(instance.created_at)
-
-    def get_updated_at(self, instance):
-        return formatted_timestamp(instance.updated_at)
+    def get_updated_at(self, obj):
+        return formatted_timestamp(obj.updated_at)
+    
+        
+    def get_other_location(self, obj):
+        print('+++++++++++++++++++',obj.city)
+        return f'{obj.city},{obj.state},{obj.country}'
+        
     class Meta:
-        model = Company
-        fields = '__all__'
-
+        model = Companies
+        fields = ['id', 'name', 'about', 'type', 'created_at', 'updated_at', 'active' ,'user_id' ,'city', 'state', 'country' , 'other_location' ]
 
 class CompanyDetailSerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
@@ -113,10 +120,47 @@ class CompanyDetailSerializer(serializers.ModelSerializer):
 
     def get_updated_at(self, instance):
         return formatted_timestamp(instance.updated_at)
+
+
+    class Meta:
+        model = Companies
+        fields = '__all__'
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True)
+    company=CompanySerializer(read_only=True)
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
+    def get_created_at(self, instance):
+        return formatted_timestamp(instance.created_at)
+
+    def get_updated_at(self, instance):
+        return formatted_timestamp(instance.updated_at)
+
+    class Meta:
+        model = Departments
+        fields = '__all__'
+
+
+
+class DepartmentDetailSerializer(serializers.ModelSerializer):
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True )
+    company=CompanySerializer(read_only=True)
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
+    def get_created_at(self, instance):
+        return formatted_timestamp(instance.created_at)
+
+    def get_updated_at(self, instance):
+        return formatted_timestamp(instance.updated_at)
     
     class Meta:
-        model = Company
+        model = Departments
         fields = '__all__'
+        
 
 
 

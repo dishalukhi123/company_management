@@ -1,4 +1,3 @@
-import pytz
 from django.contrib import admin
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
@@ -61,7 +60,7 @@ class User(AbstractBaseUser):
 
     def has_perm(self, perm, obj=None):
         return self.is_admin
-
+    
     def has_module_perms(self, app_label):
         return True
 
@@ -70,39 +69,42 @@ class User(AbstractBaseUser):
         return self.is_admin
 
     class Meta:
-        db_table = 'user'
-
-    def formatted_created_at(self):
-        local_timezone = pytz.timezone('Asia/Kolkata')
-        local_created_at = self.created_at.astimezone(local_timezone)
-        return local_created_at.strftime("%I:%M %p %A, %b %d, %Y")
-    
-    def formatted_updated_at(self):
-        local_timezone = pytz.timezone('Asia/Kolkata')
-        local_updated_at = self.updated_at.astimezone(local_timezone)
-        return local_updated_at.strftime("%I:%M %p %A, %b %d, %Y")
-
-class UserModelAdmin(admin.ModelAdmin):
-    list_display = ('id', 'email', 'first_name', 'last_name', 'is_admin')
-
-admin.site.register(User, UserModelAdmin)
+        db_table = 'users'
 
 
-class Company(models.Model):
+
+class Companies(models.Model):
     TYPE_CHOICES = (
         ('private company', 'Private Company'),
-        ('associate aompany', 'Associate company'),
+        ('associate company', 'Associate company'),
         ('government', 'Government'),
     )
-    name = models.CharField(max_length=100 , unique = True)
-    location = models.CharField(max_length=255)
+    
+    name = models.CharField(max_length=100 , unique = True )
+    city = models.CharField(max_length=100) 
+    state = models.CharField(max_length=100) 
+    country = models.CharField(max_length=100) 
     about = models.CharField(max_length = 200)
     type = models.CharField(max_length = 40 , choices=TYPE_CHOICES) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True) 
+    user_id = models.IntegerField(blank=True, null=True)
 
     
     class Meta:
-        db_table = 'company'
+        db_table = 'companies'
+
+class Departments(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(max_length=100)
+    company = models.ForeignKey(Companies, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['name', 'company'], name='unique_department_per_company')]
+        db_table = 'departments'
+    
+        
 
