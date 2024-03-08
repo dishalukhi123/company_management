@@ -4,10 +4,11 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer , DepartmentSerializer , DepartmentDetailSerializer
 from django.contrib.auth import authenticate 
-from company_management.renderers import UserRenderer 
+from django.db import IntegrityError
+from company_management.renderers import ErrorRenderer 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .models import User , Company , Department
+from .models import User , Companies , Departments
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
@@ -23,7 +24,7 @@ def get_tokens_for_user(user):
 
 
 class UserRegistrationView(APIView):
-  renderer_classes = [UserRenderer]
+  renderer_classes = [ErrorRenderer]
   def post(self, request, format=None):
     print("----request.data----", request.data)
     serializer = UserRegistrationSerializer(data=request.data)
@@ -32,7 +33,7 @@ class UserRegistrationView(APIView):
           user = serializer.save()
           token = get_tokens_for_user(user)
           return Response({'status': status.HTTP_201_CREATED,'success': True, 'message':'Registration Successful', 'data': {'token': token}}, status=status.HTTP_201_CREATED)
-    return Response({"status": 400, "success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserLoginView(APIView):
@@ -48,7 +49,7 @@ class UserLoginView(APIView):
 
     
 class UserProfileView(APIView):
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
     permission_classes = [IsAuthenticated] 
 
     def get(self, request, format=None):
@@ -58,7 +59,7 @@ class UserProfileView(APIView):
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]  
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
     def get(self, request, format=None):
         queryset = User.objects.filter(is_active=True)
         serializer = UserListSerializer(queryset, many=True)
@@ -67,7 +68,7 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
 
     def get(self, request, id, format=None):
         try:
@@ -99,10 +100,10 @@ class UserDetailView(APIView):
 
 class CompanyView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
     
     def get(self, request):
-        companies = Company.objects.all()
+        companies = Companies.objects.all()
         serializer = CompanySerializer(companies, many=True)
         return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data })
 
@@ -112,7 +113,6 @@ class CompanyView(APIView):
         if serializer.is_valid():
             print('=-=-=-=-=-=-=-=-',request.user.id)
             serializer.validated_data['user_id'] = request.user.id
-            # serializer.validated_data['other_location'] 
             serializer.save()
             return Response({'status': status.HTTP_201_CREATED, 'success' : True , 'data': serializer.data })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -120,10 +120,10 @@ class CompanyView(APIView):
 
 class CompanyDetailView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
     def get(self, request, id, format=None):
         try:
-            company = get_object_or_404(Company, id=id)
+            company = get_object_or_404(Companies, id=id)
             serializer = CompanyDetailSerializer(company)
             return Response({'status': status.HTTP_200_OK, 'success': True,'data': serializer.data})
         except Http404:
@@ -146,7 +146,7 @@ class CompanyDetailView(APIView):
 
     def delete(self, request, id, format=None):
         try:
-            company = get_object_or_404(Company, id=id)
+            company = get_object_or_404(Companies, id=id)
             company.delete()
             return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True ,'message' : 'Delete Company successfully'}, status=status.HTTP_204_NO_CONTENT)
         except Http404:
@@ -155,38 +155,32 @@ class CompanyDetailView(APIView):
 
 class DepartmentView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
 
     def get(self, request):
-        departments = Department.objects.all()
-        serializer = DepartmentSerializer(departments, many=True)
-        return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data })
+        companies = Departments.objects.all()
+        serializer = DepartmentSerializer(companies, many=True)
+        return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Department':serializer.data}})
 
     def post(self, request):
         serializer = DepartmentSerializer(data=request.data)
-        if serializer.is_valid():
-            company_id = request.data.get('company_id')
-            company = None
-            if company_id:
-                try:
-                    company = Company.objects.get(id=company_id)
-                except Company.DoesNotExist:
-                    raise ValidationError({'company_id': ['Company with this ID does not exist']})
-
-            serializer.save(company_id=company_id)
-            response_data = serializer.data
-            response_data['company_data'] = CompanySerializer(company).data
-            print('====------=====-----=====-----',response_data)
-            return Response({'status': status.HTTP_201_CREATED, 'success': True, 'data': serializer.data })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Department':serializer.data}}, status=status.HTTP_201_CREATED)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            error_message = "Department with the same name already exists for this company."
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'error': {'detail':error_message}}, status=status.HTTP_404_NOT_FOUND)
     
 
 class DepartmentDetailView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [UserRenderer]
+    renderer_classes = [ErrorRenderer]
     def get(self, request, id, format=None):
         try:
-            departments = get_object_or_404(Department, id=id)
+            departments = get_object_or_404(Departments, id=id)
             serializer = DepartmentDetailSerializer(departments)
             return Response({'status': status.HTTP_200_OK, 'success': True,'data': serializer.data})
         except Http404:
@@ -194,7 +188,7 @@ class DepartmentDetailView(APIView):
         
     def patch(self, request, id):
         try:
-            departments = get_object_or_404(Department, id=id)
+            departments = get_object_or_404(Departments, id=id)
             serializer = DepartmentDetailSerializer(departments , data=request.data, partial=True)
             if serializer.is_valid():
                 if serializer.validated_data:  
@@ -209,7 +203,7 @@ class DepartmentDetailView(APIView):
 
     def delete(self, request, id, format=None):
         try:
-            departments = get_object_or_404(Department, id=id)
+            departments = get_object_or_404(Departments, id=id)
             departments.delete()
             return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True , 'message' : 'Delete Company successfully'}, status=status.HTTP_204_NO_CONTENT)
         except Http404:

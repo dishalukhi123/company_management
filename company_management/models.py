@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
+from django.core.exceptions import ValidationError
 
 
 class UserManager(BaseUserManager):
@@ -68,11 +69,11 @@ class User(AbstractBaseUser):
         return self.is_admin
 
     class Meta:
-        db_table = 'user'
+        db_table = 'users'
 
 
 
-class Company(models.Model):
+class Companies(models.Model):
     TYPE_CHOICES = (
         ('private company', 'Private Company'),
         ('associate company', 'Associate company'),
@@ -92,18 +93,18 @@ class Company(models.Model):
 
     
     class Meta:
-        db_table = 'company'
+        db_table = 'companies'
 
-class Department(models.Model):
-    name = models.CharField(max_length=100 , unique = True )
+class Departments(models.Model):
+    name = models.CharField(max_length=100)
     description = models.TextField(max_length=100)
-    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    company = models.ForeignKey(Companies, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'department'
-
+        constraints = [models.UniqueConstraint(fields=['name', 'company'], name='unique_department_per_company')]
+        db_table = 'departments'
     
         
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .utils import formatted_timestamp
-from .models import User , Company , Department
+from .models import User , Companies , Departments
 import pytz
 
 
@@ -17,17 +17,26 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
+        email = attrs.get('email')
+        print("--attrs---", attrs)
         errors = {}
-        if password != confirm_password:
-            raise serializers.ValidationError("Password and Confirm Password don't match")
-        return attrs
+        # if password != confirm_password:
+        #     errors['password'] = ["Password and Confirm Password don't match"]
 
+        if User.objects.filter(email=email).exists():
+            errors['email'] = ["User with this email already exists."]
+
+        if errors:
+            print("---errors---", errors)
+            raise serializers.ValidationError(errors)
+
+        return attrs
+    
     def create(self, validated_data):
         password = validated_data.pop('password')
         validated_data.pop('confirm_password', None) 
         return User.objects.create_user(password=password, **validated_data)
-    
-    
+     
 
 class UserLoginSerializer(serializers.Serializer):
     email_or_username = serializers.CharField()
@@ -99,10 +108,8 @@ class CompanySerializer(serializers.ModelSerializer):
         return f'{obj.city},{obj.state},{obj.country}'
         
     class Meta:
-        model = Company
+        model = Companies
         fields = ['id', 'name', 'about', 'type', 'created_at', 'updated_at', 'active' ,'user_id' ,'city', 'state', 'country' , 'other_location' ]
-
-
 
 class CompanyDetailSerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
@@ -113,14 +120,16 @@ class CompanyDetailSerializer(serializers.ModelSerializer):
 
     def get_updated_at(self, instance):
         return formatted_timestamp(instance.updated_at)
-    
+
+
     class Meta:
-        model = Company
+        model = Companies
         fields = '__all__'
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
-    company_id = serializers.PrimaryKeyRelatedField(source='company.id', read_only=True)
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True)
+    company=CompanySerializer(read_only=True)
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
 
@@ -129,13 +138,16 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     def get_updated_at(self, instance):
         return formatted_timestamp(instance.updated_at)
-    
+
     class Meta:
-        model = Department
-        fields = ['id', 'name', 'description', 'company_id','created_at', 'updated_at']
+        model = Departments
+        fields = '__all__'
+
 
 
 class DepartmentDetailSerializer(serializers.ModelSerializer):
+    company_id = serializers.PrimaryKeyRelatedField(queryset=Companies.objects.all(),source='company', write_only=True )
+    company=CompanySerializer(read_only=True)
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
 
@@ -146,9 +158,8 @@ class DepartmentDetailSerializer(serializers.ModelSerializer):
         return formatted_timestamp(instance.updated_at)
     
     class Meta:
-        model = Department
-        fields = ['id', 'name', 'description', 'company_id','created_at', 'updated_at']
-
+        model = Departments
+        fields = '__all__'
         
 
 
