@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView 
 from rest_framework.exceptions import ValidationError
-from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer , DepartmentSerializer , DepartmentDetailSerializer , EmployeeSerializer , EmployeeDetailSerializer
+from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer , DepartmentSerializer , DepartmentDetailSerializer , EmployeeSerializer , EmployeeDetailSerializer , CompanyEmployeeSerializer
 from django.contrib.auth import authenticate 
 from django.db import IntegrityError
 from company_management.renderers import ErrorRenderer 
@@ -161,6 +161,32 @@ class CompanyDetailView(APIView):
         except Http404:
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}})
         
+        
+class CompanyEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+
+    def get(self, request, company_id):
+        try:
+            company = get_object_or_404(Companies, id=company_id)
+            serializer = CompanyEmployeeSerializer(company)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data})
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}}, status=status.HTTP_404_NOT_FOUND)
+      
+
+class CompanyDepartmentView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+
+    def get(self, request, company_id):
+        try:
+            departments = Departments.objects.filter(company_id=company_id)
+            serializer = DepartmentSerializer(departments, many=True)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Departments': serializer.data}})
+        except Departments.DoesNotExist:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Departments not found for the company'}}, status=status.HTTP_404_NOT_FOUND)
+       
 
 class DepartmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -222,8 +248,19 @@ class DepartmentDetailView(APIView):
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'department not found'}})
         
 
+class DepartmentEmployee(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
 
+    def get(self, request, department_id):
+        try:
+            employees = Employees.objects.filter(department_id=department_id)
+            serializer = EmployeeSerializer(employees, many=True)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Employees': serializer.data}})
+        except Employees.DoesNotExist:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Employees not found for the department'}}, status=status.HTTP_404_NOT_FOUND)
 
+        
 class EmployeeView(APIView):
     permission_classes = [IsAuthenticated]
     renderer_classes = [ErrorRenderer]
@@ -245,8 +282,7 @@ class EmployeeView(APIView):
         except IntegrityError as e:
             error_message = "Department with the same name already exists for this company."
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'error': {'detail':error_message}}, status=status.HTTP_404_NOT_FOUND)
-        
-
+       
 
 class EmployeeDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -283,3 +319,5 @@ class EmployeeDetailView(APIView):
             return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True , 'message' : 'Delete Employee successfully'}, status=status.HTTP_204_NO_CONTENT)
         except Http404:
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'department not found'}})
+        
+

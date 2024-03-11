@@ -74,21 +74,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserListSerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
+    companies = serializers.SerializerMethodField()
+
 
     def get_created_at(self, instance):
         return formatted_timestamp(instance.created_at)
 
     def get_updated_at(self, instance):
         return formatted_timestamp(instance.updated_at)
+    
+    def get_companies(self, obj):
+        user_companies = Companies.objects.filter(user_id=obj.id)
+        serializer = CompanySerializer(user_companies, many=True)
+        return serializer.data
+    
     class Meta:
         model = User
-        fields = ['id', 'email','username','first_name', 'last_name','gender','password','created_at' , 'updated_at']
+        fields = ['id', 'email','username','first_name', 'last_name','gender','password','created_at' , 'updated_at' , 'companies']
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'first_name', 'last_name', 'gender', 'created_at', 'updated_at']
+
+
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -156,6 +166,19 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Departments
         fields = '__all__'
+
+        
+class CompanyEmployeeSerializer(serializers.ModelSerializer):
+    employees = serializers.SerializerMethodField()
+
+    def get_employees(self, obj):
+        company_employees = Employees.objects.filter(company_id=obj.id)
+        serializer = EmployeeSerializer(company_employees, many=True)
+        return serializer.data
+
+    class Meta:
+        model = Companies
+        fields = ['id', 'name', 'about', 'employees']
 
 
 class DepartmentDetailSerializer(serializers.ModelSerializer):
