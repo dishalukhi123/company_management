@@ -4,6 +4,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 
+
 class UserManager(BaseUserManager):
     def create_user(self, email, username=None, first_name='', last_name='', gender='', password=None):
         if not email:
@@ -79,7 +80,6 @@ class Companies(models.Model):
         ('associate company', 'Associate company'),
         ('government', 'Government'),
     )
-    
     name = models.CharField(max_length=100 , unique = True )
     city = models.CharField(max_length=100) 
     state = models.CharField(max_length=100) 
@@ -106,5 +106,27 @@ class Departments(models.Model):
         constraints = [models.UniqueConstraint(fields=['name', 'company'], name='unique_department_per_company')]
         db_table = 'departments'
     
-        
 
+class Employees(models.Model):
+    POSITION_CHOICES = [
+        ('manager', 'Manager'),
+        ('developer', 'Developer'),
+        ('designer', 'Designer'),
+        ('analyst', 'Analyst'),
+    ]
+    name = models.CharField(max_length=100)
+    email = models.EmailField(max_length=50, unique=True)
+    position = models.CharField(max_length=100, choices=POSITION_CHOICES)
+    salary = models.DecimalField(max_digits=10 , decimal_places=2)
+    address = models.CharField(max_length=255)
+    about = models.TextField(max_length=255)
+    phone_number = models.CharField(max_length=10 , unique=True)
+    department = models.ForeignKey(Departments, on_delete=models.CASCADE)
+    company = models.ForeignKey(Companies, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    class Meta:
+        db_table = 'employees'

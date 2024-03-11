@@ -2,15 +2,21 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView 
 from rest_framework.exceptions import ValidationError
-from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer , DepartmentSerializer , DepartmentDetailSerializer
+from company_management.serializers import UserRegistrationSerializer , UserLoginSerializer , UserProfileSerializer , UserListSerializer , UserDetailSerializer , CompanySerializer , CompanyDetailSerializer , DepartmentSerializer , DepartmentDetailSerializer , EmployeeSerializer , EmployeeDetailSerializer , CompanyEmployeeSerializer
 from django.contrib.auth import authenticate 
 from django.db import IntegrityError
 from company_management.renderers import ErrorRenderer 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .models import User , Companies , Departments
+from .models import User , Companies , Departments , Employees
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+
+class Pagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 def get_tokens_for_user(user):
@@ -101,9 +107,12 @@ class UserDetailView(APIView):
 class CompanyView(APIView):
     permission_classes = [IsAuthenticated]
     renderer_classes = [ErrorRenderer]
+    pagination_class = Pagination 
     
     def get(self, request):
         companies = Companies.objects.all()
+        paginator = self.pagination_class()
+        result_page = paginator.paginate_queryset(companies, request)
         serializer = CompanySerializer(companies, many=True)
         return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data })
 
@@ -152,10 +161,37 @@ class CompanyDetailView(APIView):
         except Http404:
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}})
         
+        
+class CompanyEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+
+    def get(self, request, company_id):
+        try:
+            company = get_object_or_404(Companies, id=company_id)
+            serializer = CompanyEmployeeSerializer(company)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': serializer.data})
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Company not found'}}, status=status.HTTP_404_NOT_FOUND)
+      
+
+class CompanyDepartmentView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+
+    def get(self, request, company_id):
+        try:
+            departments = Departments.objects.filter(company_id=company_id)
+            serializer = DepartmentSerializer(departments, many=True)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Departments': serializer.data}})
+        except Departments.DoesNotExist:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Departments not found for the company'}}, status=status.HTTP_404_NOT_FOUND)
+       
 
 class DepartmentView(APIView):
     permission_classes = [IsAuthenticated]
     renderer_classes = [ErrorRenderer]
+    pagination_class = Pagination 
 
     def get(self, request):
         companies = Departments.objects.all()
@@ -167,7 +203,7 @@ class DepartmentView(APIView):
         try:
             if serializer.is_valid():
                 serializer.save()
-                return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Department':serializer.data}}, status=status.HTTP_201_CREATED)
+                return Response({'status': status.HTTP_201_CREATED, 'success': True, 'data': {'Department':serializer.data}}, status=status.HTTP_201_CREATED)
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError as e:
@@ -178,11 +214,13 @@ class DepartmentView(APIView):
 class DepartmentDetailView(APIView):
     permission_classes = [IsAuthenticated]
     renderer_classes = [ErrorRenderer]
+    pagination_class = Pagination 
+
     def get(self, request, id, format=None):
         try:
             departments = get_object_or_404(Departments, id=id)
             serializer = DepartmentDetailSerializer(departments)
-            return Response({'status': status.HTTP_200_OK, 'success': True,'data': serializer.data})
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Department':serializer.data}})
         except Http404:
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'department not found'}}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -208,3 +246,78 @@ class DepartmentDetailView(APIView):
             return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True , 'message' : 'Delete Company successfully'}, status=status.HTTP_204_NO_CONTENT)
         except Http404:
             return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'department not found'}})
+        
+
+class DepartmentEmployee(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+
+    def get(self, request, department_id):
+        try:
+            employees = Employees.objects.filter(department_id=department_id)
+            serializer = EmployeeSerializer(employees, many=True)
+            return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Employees': serializer.data}})
+        except Employees.DoesNotExist:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Employees not found for the department'}}, status=status.HTTP_404_NOT_FOUND)
+
+        
+class EmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+    pagination_class = Pagination 
+
+    def get(self, request):
+        employees = Employees.objects.all()
+        serializer = EmployeeSerializer(employees, many=True)
+        return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Employees':serializer.data}})
+
+    def post(self, request):
+        serializer = EmployeeSerializer(data=request.data)
+        try:
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'status': status.HTTP_200_OK, 'success': True, 'data': {'Employee':serializer.data}}, status=status.HTTP_201_CREATED)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            error_message = "Department with the same name already exists for this company."
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'error': {'detail':error_message}}, status=status.HTTP_404_NOT_FOUND)
+       
+
+class EmployeeDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [ErrorRenderer]
+    pagination_class = Pagination 
+
+    def get(self, request, id, format=None):
+        try:
+            employees = get_object_or_404(Employees, id=id)
+            serializer = EmployeeDetailSerializer(employees)
+            return Response({'status': status.HTTP_201_CREATED, 'success': True, 'data': {'Employee':serializer.data}}, status=status.HTTP_201_CREATED)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'Employee not found'}}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def patch(self, request, id):
+        try:
+            employees = get_object_or_404(Employees, id=id)
+            serializer = EmployeeDetailSerializer(employees , data=request.data, partial=True)
+            if serializer.is_valid():
+                if serializer.validated_data:  
+                    serializer.save()
+                    return Response({'status': status.HTTP_201_CREATED, 'success': True, 'message': 'Employee details updated successfully'})
+                else:  
+                    return Response({'status': status.HTTP_200_OK, 'success': True, 'errors': {'detail': 'No changes to update'}})
+            return Response(serializer.errors,  status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response({'status': status.HTTP_400_BAD_REQUEST, 'success': False, 'errors': {'detail': 'Employee not found'}})
+
+
+    def delete(self, request, id, format=None):
+        try:
+            employees = get_object_or_404(Employees, id=id)
+            employees.delete()
+            return Response({'status': status.HTTP_204_NO_CONTENT, 'success': True , 'message' : 'Delete Employee successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except Http404:
+            return Response({'status': status.HTTP_404_NOT_FOUND, 'success': False, 'errors': {'detail': 'department not found'}})
+        
+
